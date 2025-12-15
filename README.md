@@ -2,7 +2,7 @@
 
 **Darkware Zapret** is a native macOS status bar application that wraps the powerful [zapret](https://github.com/bol-van/zapret) DPI bypass tool into a user-friendly, one-click solution.
 
-![Darkware Zapret](https://raw.githubusercontent.com/bol-van/zapret/master/docs/logo.png)
+![Darkware Zapret UI](assets/preview.png)
 
 ## Features
 
