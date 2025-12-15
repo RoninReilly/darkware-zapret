@@ -20,6 +20,7 @@ jobs:
       - name: Build Swift Project
         run: |
           ls -la
+          cd zapret_src && make mac && cd ..
           swift build -c release
 
       - name: Create App Bundle and DMG
