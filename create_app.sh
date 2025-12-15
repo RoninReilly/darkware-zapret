@@ -39,7 +39,7 @@ cat > "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist" <<EOF
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <string>1.0.6</string>
+    <string>1.0.7</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
     <key>LSUIElement</key>
@@ -56,6 +56,10 @@ chmod +x "$OUTPUT_DIR/$APP_NAME.app/Contents/Resources/install_darkware.sh"
 
 echo "App Bundle created at $OUTPUT_DIR/$APP_NAME.app"
 
+
+# Ad-hoc Code Signing (Required for Apple Silicon to run without "Damaged" error)
+echo "Signing App Bundle (Ad-Hoc)..."
+codesign --force --options runtime --deep --sign - "$OUTPUT_DIR/$APP_NAME.app"
 
 echo "Creating DMG Installer..."
 DMG_NAME="DarkwareZapret_Installer"
