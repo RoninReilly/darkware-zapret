@@ -251,10 +251,11 @@ class ZapretManager: ObservableObject {
         currentStrategy = strategy
         UserDefaults.standard.set(strategy.rawValue, forKey: "ZapretStrategy")
         
-        // Write config and restart
-        let script = """
-        echo '\(strategy.configContent)' > \(configPath) && \(restartCommand)
-        """
+        // Write config command
+        let writeConfig = "echo '\(strategy.configContent)' > \(configPath)"
+        
+        // If running, write config AND restart. If not running, just write config.
+        let script = self.isRunning ? "\(writeConfig) && \(restartCommand)" : writeConfig
         
         DispatchQueue.global(qos: .userInitiated).async {
             let task = Process()
