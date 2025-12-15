@@ -18,7 +18,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build Swift Project
-        run: swift build -c release
+        run: |
+          ls -la
+          swift build -c release
 
       - name: Create App Bundle and DMG
         run: |

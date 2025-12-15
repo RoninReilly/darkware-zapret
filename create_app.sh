@@ -79,6 +79,15 @@ hdiutil create -srcfolder "$STAGING_DIR" -volname "$VOL_NAME" -fs HFS+ -fsargs "
 DEVICE=$(hdiutil attach -readwrite -noverify "$OUTPUT_DIR/pack.temp.dmg" | egrep '^/dev/' | sed 1q | awk '{print $1}')
 sleep 2
 
+# Copy Volume Icon
+if [ -f "DarkwareZapret.icns" ]; then
+    cp "DarkwareZapret.icns" "/Volumes/$VOL_NAME/.VolumeIcon.icns"
+    # Set volume icon attribute (might fail if SetFile not found, ignore error)
+    SetFile -a C "/Volumes/$VOL_NAME" 2>/dev/null || true
+else
+    echo "Warning: DarkwareZapret.icns not found, skipping icon setup."
+fi
+
 # Customize with AppleScript
 echo "Customizing DMG appearance..."
 osascript <<EOF

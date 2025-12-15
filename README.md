@@ -61,3 +61,15 @@ The resulting `.dmg` will be in the project root.
 ## License
 
 MIT License.
+
+## Troubleshooting
+
+### "App is damaged and can't be opened"
+Since the app is not signed with an obscure Apple Developer ID (which costs $99/year), macOS puts it in quarantine. To fix this:
+
+1. Open Terminal.
+2. Run the following command:
+   ```bash
+   xattr -cr /Applications/"darkware zapret.app"
+   ```
+3. Launch the app again.
