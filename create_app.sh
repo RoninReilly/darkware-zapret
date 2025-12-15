@@ -43,6 +43,7 @@ cat > "$OUTPUT_DIR/$APP_NAME.app/Contents/Info.plist" <<EOF
     <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
     <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
