@@ -5,7 +5,10 @@ APP_NAME="darkware zapret"
 EXECUTABLE_NAME="DarkwareZapret"
 BUNDLE_IDENTIFIER="com.darkware.zapret"
 OUTPUT_DIR="."
-VERSION="1.0.12"
+# Get version from argument or default to 1.0.0
+VERSION="${1:-1.0.0}"
+# Strip leading 'v' (e.g. v1.0.12 -> 1.0.12)
+VERSION="${VERSION#v}"
 
 echo "Building..."
 swift build -c release

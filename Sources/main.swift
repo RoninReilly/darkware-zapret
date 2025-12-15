@@ -153,7 +153,8 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                Text(installerManager.isInstalled ? "v1.0.12" : "")
+                let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Dev"
+                Text(installerManager.isInstalled ? "v\(appVersion)" : "")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }

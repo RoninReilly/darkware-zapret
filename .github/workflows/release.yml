@@ -28,7 +28,7 @@ jobs:
           chmod +x create_app.sh
           # Create dummy icons to prevent script failure if they are missing locally but script expects them
           # (Assuming script uses internal SF Symbols logic now, but checking just in case)
-          ./create_app.sh
+          ./create_app.sh ${{ github.ref_name }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
