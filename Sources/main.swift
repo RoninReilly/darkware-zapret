@@ -198,7 +198,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
         DISABLE_IPV6=0
         """
         
-        let hostlistArgs = "--hostlist-auto=/opt/darkware-zapret/ipset/zapret-hosts-auto.txt --hostlist-auto-fail-threshold=3 --hostlist-auto-fail-time=60 --hostlist-auto-retrans-threshold=3"
+        let hostlistArgs = "--hostlist=/opt/darkware-zapret/ipset/zapret-hosts.txt --hostlist-auto=/opt/darkware-zapret/ipset/zapret-hosts-auto.txt --hostlist-auto-fail-threshold=3 --hostlist-auto-fail-time=60 --hostlist-auto-retrans-threshold=3"
         
         switch self {
         case .splitDisorder:

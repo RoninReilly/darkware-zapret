@@ -48,6 +48,16 @@ mkdir -p "$TARGET_DIR/init.d/macos"
 touch "$TARGET_DIR/ipset/zapret-hosts-user.txt"
 touch "$TARGET_DIR/ipset/zapret-hosts-auto.txt"
 touch "$TARGET_DIR/ipset/zapret-hosts-user-exclude.txt"
+touch "$TARGET_DIR/ipset/zapret-hosts.txt"
+
+# Make helper scripts executable
+chmod +x "$TARGET_DIR/ipset/"*.sh
+
+# Try to download Antizapret list
+echo "Downloading Antizapret hostlist..."
+# Run in subshell to not change script cwd, ignore errors to not break install
+(cd "$TARGET_DIR/ipset" && ./get_antizapret_domains.sh) || echo "Warning: Failed to download Antizapret list. Using empty list."
+ chmod 644 "$TARGET_DIR/ipset/"*.txt
 
 # Add dummy entry if user list is empty (best practice from install_easy.sh)
 if [ ! -s "$TARGET_DIR/ipset/zapret-hosts-user.txt" ]; then
