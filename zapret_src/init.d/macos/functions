@@ -15,7 +15,7 @@ IPSET_DIR=$ZAPRET_BASE/ipset
 
 PIDDIR=/var/run
 [ -n "$TPPORT" ] || TPPORT=988
-[ -n "$TPPORT_SOCKS" ] || TPPORT=987
+[ -n "$TPPORT_SOCKS" ] || TPPORT_SOCKS=987
 [ -n "$WS_USER" ] || WS_USER=daemon
 TPWS_WAIT="--bind-wait-ifup=30 --bind-wait-ip=30"
 TPWS_WAIT_SOCKS6="$TPWS_WAIT --bind-wait-ip-linklocal=30"

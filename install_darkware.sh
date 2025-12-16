@@ -26,9 +26,17 @@ mkdir -p "$TARGET_DIR"
 # Copy files (using dot syntax for reliable copying of content)
 cp -R "$SOURCE_DIR/." "$TARGET_DIR/" || { echo "Copy failed" >> "$LOG"; exit 1; }
 
-# Create/Reset strategy config if not exists
+# Create/Reset strategy config if not exists - write default working config
 if [ ! -f "$TARGET_DIR/config_custom" ]; then
-    echo "# Custom strategy config" > "$TARGET_DIR/config_custom"
+    cat > "$TARGET_DIR/config_custom" <<'CONFIGEOF'
+TPWS_ENABLE=1
+TPWS_SOCKS_ENABLE=1
+TPWS_PORTS=80,443
+INIT_APPLY_FW=1
+DISABLE_IPV6=0
+GZIP_LISTS=0
+TPWS_OPT="--filter-tcp=80 --methodeol --hostlist=/opt/darkware-zapret/ipset/zapret-hosts.txt --hostlist-auto=/opt/darkware-zapret/ipset/zapret-hosts-auto.txt --hostlist-auto-fail-threshold=3 --hostlist-auto-fail-time=60 --hostlist-auto-retrans-threshold=3 --new --filter-tcp=443 --split-pos=1,midsld --disorder --hostlist=/opt/darkware-zapret/ipset/zapret-hosts.txt --hostlist-auto=/opt/darkware-zapret/ipset/zapret-hosts-auto.txt --hostlist-auto-fail-threshold=3 --hostlist-auto-fail-time=60 --hostlist-auto-retrans-threshold=3"
+CONFIGEOF
 fi
 chmod 666 "$TARGET_DIR/config_custom"
 
@@ -90,7 +98,7 @@ cat > "$PLIST_PATH" <<EOF
     <key>ProgramArguments</key>
     <array>
         <string>/opt/darkware-zapret/init.d/macos/zapret</string>
-        <string>start-daemons</string>
+        <string>start</string>
     </array>
     <key>RunAtLoad</key>
     <true/>

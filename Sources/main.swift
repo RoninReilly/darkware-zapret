@@ -194,6 +194,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
         let commonVars = """
         TPWS_ENABLE=1
         TPWS_SOCKS_ENABLE=1
+        TPWS_PORTS=80,443
         INIT_APPLY_FW=1
         DISABLE_IPV6=0
         GZIP_LISTS=0
