@@ -205,17 +205,17 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
         case .splitDisorder:
             return """
             \(commonVars)
-            TPWS_OPT="--filter-tcp=80 --methodeol --new \(hostlistArgs) --filter-tcp=443 --split-pos=1,midsld --disorder \(hostlistArgs)"
+            TPWS_OPT="--filter-tcp=80 --methodeol \(hostlistArgs) --new --filter-tcp=443 --split-pos=1,midsld --disorder \(hostlistArgs)"
             """
         case .fakeSplit:
             return """
             \(commonVars)
-            TPWS_OPT="--filter-tcp=80 --methodeol --new \(hostlistArgs) --filter-tcp=443 --split-pos=1,midsld --disorder --fake \(hostlistArgs)"
+            TPWS_OPT="--filter-tcp=80 --methodeol \(hostlistArgs) --new --filter-tcp=443 --split-pos=1,midsld --disorder --fake \(hostlistArgs)"
             """
         case .fakeOnly:
             return """
             \(commonVars)
-            TPWS_OPT="--filter-tcp=80 --methodeol --new \(hostlistArgs) --filter-tcp=443 --fake \(hostlistArgs)"
+            TPWS_OPT="--filter-tcp=80 --methodeol \(hostlistArgs) --new --filter-tcp=443 --fake \(hostlistArgs)"
             """
         }
     }
