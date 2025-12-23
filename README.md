@@ -1,11 +1,11 @@
 # Darkware Zapret for macOS
 
-[![Release](https://img.shields.io/github/v/release/RoninReilly/darkware-zapret?style=flat-square)](https://github.com/RoninReilly/darkware-zapret/releases/latest)
-[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square)](https://github.com/RoninReilly/darkware-zapret)
-[![License](https://img.shields.io/github/license/RoninReilly/darkware-zapret?style=flat-square)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/RoninReilly/darkware-zapret?style=flat-square)](https://github.com/RoninReilly/darkware-zapret/stargazers)
+[![Release](https://img.shields.io/github/v/release/RoninReilly/darkware-zapret?style=plastic&color=green)](https://github.com/RoninReilly/darkware-zapret/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-black?style=plastic)](https://github.com/RoninReilly/darkware-zapret)
+[![License](https://img.shields.io/github/license/RoninReilly/darkware-zapret?style=plastic&color=blue)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/RoninReilly/darkware-zapret?style=plastic&color=yellow)](https://github.com/RoninReilly/darkware-zapret/stargazers)
 
-**🇷🇺 [Читать на русском](README.ru.md)**
+**🇷[На русском](README.ru.md)**
 
 **Darkware Zapret** is a native macOS menu bar app that wraps the [zapret](https://github.com/bol-van/zapret) DPI bypass tool into a simple one-click solution.
 
