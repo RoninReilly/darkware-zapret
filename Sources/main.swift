@@ -185,8 +185,9 @@ struct ContentView: View {
 // Strategies
 enum ZapretStrategy: String, CaseIterable, Identifiable {
     case splitDisorder = "Split + Disorder"
-    case fakeSplit = "Fake + Split"
-    case fakeOnly = "Fake Only"
+    case discordFix = "Discord Fix"
+    case tlsrecSplit = "TLSRec + Split"
+    case aggressive = "Aggressive"
     
     var id: String { self.rawValue }
     
@@ -205,6 +206,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
         
         switch self {
         case .splitDisorder:
+            // Original working strategy for YouTube
             return """
             \(commonVars)
             TPWS_OPT="
@@ -212,20 +214,31 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
             --filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>
             "
             """
-        case .fakeSplit:
+        case .discordFix:
+            // Strategy with tlsrec for Discord compatibility
             return """
             \(commonVars)
             TPWS_OPT="
             --filter-tcp=80 --methodeol <HOSTLIST> --new
-            --filter-tcp=443 --split-pos=1,midsld --disorder --dpi-desync-fake-tls=0x00000000 <HOSTLIST>
+            --filter-tcp=443 --tlsrec=sniext --split-pos=1,midsld --disorder <HOSTLIST>
             "
             """
-        case .fakeOnly:
+        case .tlsrecSplit:
+            // TLS record split at SNI extension boundary
             return """
             \(commonVars)
             TPWS_OPT="
             --filter-tcp=80 --methodeol <HOSTLIST> --new
-            --filter-tcp=443 --dpi-desync-fake-tls=0x00000000 <HOSTLIST>
+            --filter-tcp=443 --tlsrec=midsld --split-pos=midsld --disorder <HOSTLIST>
+            "
+            """
+        case .aggressive:
+            // Most aggressive strategy with multiple techniques
+            return """
+            \(commonVars)
+            TPWS_OPT="
+            --filter-tcp=80 --methodeol --hostdot <HOSTLIST> --new
+            --filter-tcp=443 --tlsrec=sniext --split-pos=1,midsld --disorder --oob <HOSTLIST>
             "
             """
         }
