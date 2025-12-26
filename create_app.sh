@@ -11,7 +11,7 @@ VERSION="${1:-1.0.14}"
 VERSION="${VERSION#v}"
 
 echo "Building..."
-swift build -c release --arch arm64 --arch x86_64
+swift build -c release --arch arm64 --arch x86_64 -Xswiftc -parse-as-library
 
 echo "Creating App Bundle..."
 mkdir -p "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS"
