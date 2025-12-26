@@ -17,8 +17,15 @@ echo "Creating App Bundle..."
 mkdir -p "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS"
 mkdir -p "$OUTPUT_DIR/$APP_NAME.app/Contents/Resources"
 
-# Copy binary
-cp ".build/release/$EXECUTABLE_NAME" "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+# Copy binary - check both locations (single arch vs multi-arch build)
+if [ -f ".build/apple/Products/Release/$EXECUTABLE_NAME" ]; then
+    cp ".build/apple/Products/Release/$EXECUTABLE_NAME" "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+elif [ -f ".build/release/$EXECUTABLE_NAME" ]; then
+    cp ".build/release/$EXECUTABLE_NAME" "$OUTPUT_DIR/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+else
+    echo "Error: Binary not found!"
+    exit 1
+fi
 
 echo "Copying resources..."
 cp -R "zapret_src" "$OUTPUT_DIR/$APP_NAME.app/Contents/Resources/zapret"
