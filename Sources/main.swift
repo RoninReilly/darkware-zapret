@@ -5,10 +5,11 @@ import AppKit
 struct DarkwareZapretApp: App {
     @StateObject private var zapretManager = ZapretManager()
     @StateObject private var installerManager = InstallerManager()
+    @StateObject private var diagnosticsManager = DiagnosticsManager()
     
     var body: some Scene {
         MenuBarExtra {
-            ContentView(zapretManager: zapretManager, installerManager: installerManager)
+            ContentView(zapretManager: zapretManager, installerManager: installerManager, diagnosticsManager: diagnosticsManager)
         } label: {
             Image(systemName: zapretManager.isRunning ? "checkmark.shield.fill" : "xmark.shield.fill")
         }
@@ -19,6 +20,7 @@ struct DarkwareZapretApp: App {
 struct ContentView: View {
     @ObservedObject var zapretManager: ZapretManager
     @ObservedObject var installerManager: InstallerManager
+    @ObservedObject var diagnosticsManager: DiagnosticsManager
     
     var body: some View {
         VStack(spacing: 0) {
@@ -151,6 +153,19 @@ struct ContentView: View {
                 .font(.subheadline)
                 .foregroundStyle(.primary)
                 
+                if installerManager.isInstalled {
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 4)
+                    
+                    Button("Diagnostics") {
+                        openDiagnosticsWindow()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.subheadline)
+                    .foregroundStyle(.blue)
+                }
+                
                 Spacer()
                 
                 let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Dev"
@@ -179,6 +194,20 @@ struct ContentView: View {
                 Task { await zapretManager.updateStatus() }
             }
         }
+    }
+    
+    private func openDiagnosticsWindow() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 650, height: 500),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Diagnostics"
+        window.contentView = NSHostingView(rootView: DiagnosticsView(diagnosticsManager: diagnosticsManager))
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -449,5 +478,198 @@ class InstallerManager: ObservableObject {
             self.errorMessage = "Prep failed: \(error.localizedDescription)"
             self.isInstalling = false
         }
+    }
+}
+
+// MARK: - Diagnostics
+
+enum ScanLevel: String, CaseIterable, Identifiable {
+    case quick = "Quick"
+    case standard = "Standard"
+    case force = "Force"
+    
+    var id: String { rawValue }
+}
+
+@MainActor
+class DiagnosticsManager: ObservableObject {
+    @Published var isRunning = false
+    @Published var output = ""
+    @Published var scanLevel: ScanLevel = .quick
+    @Published var testDomain = "discord.com"
+    
+    private var process: Process?
+    
+    func runDiagnostics() {
+        guard !isRunning else { return }
+        isRunning = true
+        output = "Starting diagnostics...\n"
+        
+        let zapretPath = "/opt/darkware-zapret"
+        let blockcheckPath = "\(zapretPath)/blockcheck.sh"
+        
+        // Check if blockcheck exists
+        guard FileManager.default.fileExists(atPath: blockcheckPath) else {
+            output += "Error: blockcheck.sh not found at \(blockcheckPath)\n"
+            isRunning = false
+            return
+        }
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/bash")
+            process.arguments = ["-c", """
+                cd "\(zapretPath)" && \
+                BATCH=1 \
+                SKIP_PKTWS=1 \
+                SCANLEVEL=\(self.scanLevel.rawValue.lowercased()) \
+                DOMAINS="\(self.testDomain)" \
+                ./blockcheck.sh 2>&1
+                """]
+            
+            process.currentDirectoryURL = URL(fileURLWithPath: zapretPath)
+            
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            
+            self.process = process
+            
+            pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+                let data = handle.availableData
+                if data.isEmpty { return }
+                if let str = String(data: data, encoding: .utf8) {
+                    DispatchQueue.main.async {
+                        self?.output += str
+                    }
+                }
+            }
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                DispatchQueue.main.async {
+                    self.output += "\nError running diagnostics: \(error.localizedDescription)\n"
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.output += "\n--- Diagnostics finished ---\n"
+                self.isRunning = false
+                self.process = nil
+            }
+        }
+    }
+    
+    func stopDiagnostics() {
+        process?.terminate()
+        isRunning = false
+        output += "\n--- Diagnostics cancelled ---\n"
+    }
+    
+    func copyResults() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(output, forType: .string)
+    }
+}
+
+struct DiagnosticsView: View {
+    @ObservedObject var diagnosticsManager: DiagnosticsManager
+    @Environment(\.dismiss) var dismiss
+    @State private var copied = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Settings
+            
+            // Settings
+            HStack {
+                Text("Domain:")
+                    .font(.subheadline)
+                TextField("Domain to test", text: $diagnosticsManager.testDomain)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 150)
+                    .disabled(diagnosticsManager.isRunning)
+                
+                Spacer()
+                
+                Text("Level:")
+                    .font(.subheadline)
+                Picker("", selection: $diagnosticsManager.scanLevel) {
+                    ForEach(ScanLevel.allCases) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(width: 120)
+                .disabled(diagnosticsManager.isRunning)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            
+            Divider()
+            
+            // Output
+            ScrollViewReader { proxy in
+                ScrollView {
+                    Text(diagnosticsManager.output)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .id("output")
+                }
+                .onChange(of: diagnosticsManager.output) { _ in
+                    withAnimation {
+                        proxy.scrollTo("output", anchor: .bottom)
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
+            .padding(8)
+            .background(Color(NSColor.textBackgroundColor))
+            
+            Divider()
+            
+            // Actions
+            HStack {
+                if diagnosticsManager.isRunning {
+                    Button("Stop") {
+                        diagnosticsManager.stopDiagnostics()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(.leading, 8)
+                } else {
+                    Button("Run Diagnostics") {
+                        diagnosticsManager.runDiagnostics()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                
+                Spacer()
+                
+                Button {
+                    diagnosticsManager.copyResults()
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        copied = false
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        Text(copied ? "Copied!" : "Copy Results")
+                    }
+                }
+                .disabled(diagnosticsManager.output.isEmpty)
+            }
+            .padding()
+        }
+        .frame(width: 600, height: 500)
     }
 }
