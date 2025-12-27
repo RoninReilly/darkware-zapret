@@ -36,10 +36,10 @@
 
 | Strategy | Description |
 |----------|-------------|
-| **Split+Disorder** | Splits TCP packet and sends second fragment first, confusing DPI |
-| **TLSRec+Split** | Splits TLS record at SNI extension boundary + TCP disorder |
-| **TLSRec MidSLD** | Splits TLS record in the middle of second-level domain name |
-| **TLSRec+OOB** | TLS record split + out-of-band byte injection to break DPI state |
+| **Split+Disorder** | Splits TCP packet at position 1 and middle of domain name (midsld). Sends second fragment before first using `--disorder` flag. DPI expects ordered packets and fails to reassemble the hostname. |
+| **TLSRec+Split** | Creates two TLS records by splitting at SNI extension boundary (`--tlsrec=sniext`). Combined with TCP split at midsld position and disorder. DPI sees incomplete TLS handshake in first record. |
+| **TLSRec MidSLD** | Splits TLS record right in the middle of second-level domain (`--tlsrec=midsld`). Example: `disco` + `rd.com`. DPI cannot match partial domain against blocklist. |
+| **TLSRec+OOB** | All of the above plus `--hostdot` which adds a dot after hostname in HTTP Host header. Additional confusion layer for HTTP-level DPI inspection. |
 
 ## How it Works
 

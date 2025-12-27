@@ -35,10 +35,10 @@
 
 | Стратегия | Описание |
 |-----------|----------|
-| **Split+Disorder** | Разбивает TCP пакет и отправляет второй фрагмент первым, сбивая DPI |
-| **TLSRec+Split** | Разбивает TLS record на границе SNI extension + TCP disorder |
-| **TLSRec MidSLD** | Разбивает TLS record посередине домена второго уровня |
-| **TLSRec+OOB** | Разбиение TLS record + OOB байт для сброса состояния DPI |
+| **Split+Disorder** | Разбивает TCP пакет в позиции 1 и середине домена (midsld). Отправляет второй фрагмент перед первым через `--disorder`. DPI ожидает упорядоченные пакеты и не может собрать hostname. |
+| **TLSRec+Split** | Создаёт два TLS record, разбивая на границе SNI extension (`--tlsrec=sniext`). Плюс TCP split на позиции midsld и disorder. DPI видит неполный TLS handshake в первом record. |
+| **TLSRec MidSLD** | Разбивает TLS record прямо посередине домена второго уровня (`--tlsrec=midsld`). Пример: `disco` + `rd.com`. DPI не может сматчить частичный домен со списком блокировок. |
+| **TLSRec+OOB** | Всё вышеперечисленное плюс `--hostdot` — добавляет точку после hostname в HTTP Host header. Дополнительный слой путаницы для HTTP-level DPI. |
 
 ## Как это работает
 
