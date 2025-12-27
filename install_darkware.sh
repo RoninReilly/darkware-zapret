@@ -78,7 +78,7 @@ chmod +x "$TARGET_DIR/ipset/"*.sh
 # Try to download Re-filter list (contains YouTube and other needed domains)
 echo "Downloading Re-filter hostlist..."
 # Run in subshell to not change script cwd, ignore errors to not break install
-(export GZIP_LISTS=0 && cd "$TARGET_DIR/ipset" && ./get_refilter_domains.sh) || echo "Warning: Failed to download Re-filter list. Using empty list."
+(export GZIP_LISTS=0 && cd "$TARGET_DIR/ipset" && ./get_refilter_domains.sh >/dev/null 2>&1) || echo "Warning: Failed to download Re-filter list. Using empty list."
 chmod 644 "$TARGET_DIR/ipset/"*.txt
 
 # Add dummy entry if user list is empty (best practice from install_easy.sh)
@@ -129,3 +129,4 @@ launchctl unload "$PLIST_PATH" 2>/dev/null || true
 launchctl load -w "$PLIST_PATH"
 
 echo "Installation complete."
+exit 0

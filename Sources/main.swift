@@ -199,6 +199,17 @@ struct ContentView: View {
                     .buttonStyle(.plain)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 4)
+                    
+                    Button("Uninstall Service") {
+                        installerManager.uninstall()
+                    }
+                    .buttonStyle(.plain)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
@@ -794,6 +805,32 @@ class InstallerManager: ObservableObject {
         let hasSudoers = fileManager.fileExists(atPath: sudoersFile)
         
         self.isInstalled = hasDir && hasSudoers
+    }
+    
+    func uninstall() {
+        self.isInstalling = true
+        self.errorMessage = nil
+        
+        let path = "/opt/darkware-zapret"
+        let sudoers = "/etc/sudoers.d/darkware-zapret"
+        
+        let scriptSource = "do shell script \"rm -rf '\(path)' && rm -f '\(sudoers)'\" with administrator privileges"
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            if let scriptObject = NSAppleScript(source: scriptSource) {
+                scriptObject.executeAndReturnError(&error)
+            }
+            
+            DispatchQueue.main.async {
+                if let error = error {
+                    self.errorMessage = (error["NSAppleScriptErrorBriefMessage"] as? String) ?? "Uninstall failed"
+                } else {
+                    self.checkInstallation()
+                }
+                self.isInstalling = false
+            }
+        }
     }
     
     func install() {
