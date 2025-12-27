@@ -36,10 +36,10 @@
 
 | Strategy | Description |
 |----------|-------------|
-| **Split+Disorder** | TCP splitting with packet reordering |
-| **TLSRec+Split** | TLS record + TCP splitting |
-| **TLSRec MidSLD** | TLS record split at domain boundary |
-| **TLSRec+OOB** | TLS record + OOB byte injection |
+| **Split+Disorder** | Splits TCP packet and sends second fragment first, confusing DPI |
+| **TLSRec+Split** | Splits TLS record at SNI extension boundary + TCP disorder |
+| **TLSRec MidSLD** | Splits TLS record in the middle of second-level domain name |
+| **TLSRec+OOB** | TLS record split + out-of-band byte injection to break DPI state |
 
 ## How it Works
 

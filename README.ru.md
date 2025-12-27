@@ -35,10 +35,10 @@
 
 | Стратегия | Описание |
 |-----------|----------|
-| **Split+Disorder** | Разбиение TCP с переупорядочиванием |
-| **TLSRec+Split** | TLS record + TCP разбиение |
-| **TLSRec MidSLD** | TLS record на границе домена |
-| **TLSRec+OOB** | TLS record + OOB байт |
+| **Split+Disorder** | Разбивает TCP пакет и отправляет второй фрагмент первым, сбивая DPI |
+| **TLSRec+Split** | Разбивает TLS record на границе SNI extension + TCP disorder |
+| **TLSRec MidSLD** | Разбивает TLS record посередине домена второго уровня |
+| **TLSRec+OOB** | Разбиение TLS record + OOB байт для сброса состояния DPI |
 
 ## Как это работает
 
