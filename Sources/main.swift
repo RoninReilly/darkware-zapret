@@ -81,58 +81,59 @@ struct ContentView: View {
                     
                     Divider()
                     
-                    // Engine Selection
-                    HStack {
-                        Text("Engine")
-                            .font(.body)
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { zapretManager.currentEngine },
-                            set: { zapretManager.setEngine($0) }
-                        )) {
-                            ForEach(Engine.allCases) { engine in
-                                Text(engine.rawValue).tag(engine)
+                    // Settings (Engine & Strategy)
+                    VStack(spacing: 6) {
+                        // Engine Selection
+                        HStack {
+                            Text("Engine")
+                                .font(.body)
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { zapretManager.currentEngine },
+                                set: { zapretManager.setEngine($0) }
+                            )) {
+                                ForEach(Engine.allCases) { engine in
+                                    Text(engine.rawValue).tag(engine)
+                                }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 160, alignment: .trailing) // Force alignment to right
+                            .disabled(zapretManager.isLoading)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 140) // Fixed width for alignment
-                        .disabled(zapretManager.isLoading)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 4)
-                    
-                    // Strategy Selection (dynamic based on engine)
-                    HStack {
-                        Text("Strategy")
-                            .font(.body)
-                        Spacer()
                         
-                        Group {
-                            if zapretManager.currentEngine == .tpws {
-                                Picker("", selection: Binding(
-                                    get: { zapretManager.currentStrategy },
-                                    set: { zapretManager.setStrategy($0) }
-                                )) {
-                                    ForEach(ZapretStrategy.allCases) { strategy in
-                                        Text(strategy.rawValue).tag(strategy)
+                        // Strategy Selection
+                        HStack {
+                            Text("Strategy")
+                                .font(.body)
+                            Spacer()
+                            
+                            Group {
+                                if zapretManager.currentEngine == .tpws {
+                                    Picker("", selection: Binding(
+                                        get: { zapretManager.currentStrategy },
+                                        set: { zapretManager.setStrategy($0) }
+                                    )) {
+                                        ForEach(ZapretStrategy.allCases) { strategy in
+                                            Text(strategy.rawValue).tag(strategy)
+                                        }
                                     }
-                                }
-                            } else {
-                                Picker("", selection: Binding(
-                                    get: { zapretManager.currentByeDPIStrategy },
-                                    set: { zapretManager.setByeDPIStrategy($0) }
-                                )) {
-                                    ForEach(ByeDPIStrategy.allCases) { strategy in
-                                        Text(strategy.rawValue).tag(strategy)
+                                } else {
+                                    Picker("", selection: Binding(
+                                        get: { zapretManager.currentByeDPIStrategy },
+                                        set: { zapretManager.setByeDPIStrategy($0) }
+                                    )) {
+                                        ForEach(ByeDPIStrategy.allCases) { strategy in
+                                            Text(strategy.rawValue).tag(strategy)
+                                        }
                                     }
                                 }
                             }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(width: 160, alignment: .trailing) // Force alignment to right
+                            .disabled(zapretManager.isLoading)
                         }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 140) // Fixed width for alignment
-                        .disabled(zapretManager.isLoading)
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 4)

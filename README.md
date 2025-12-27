@@ -40,7 +40,7 @@ Lightweight TCP-only transparent proxy. Best for simple web browsing and standar
 - **Mode:** Transparent Proxy
 
 ### ciadpi (ByeDPI)
-Advanced SOCKS5 proxy with **UDP support**. Required for **Discord Voice**, **WebRTC**, and **HTTP/3 (QUIC)**.
+Advanced SOCKS5 proxy with **UDP support**.
 - **Protocol:** TCP + UDP
 - **Mode:** System SOCKS5 Proxy (Auto-configured)
 - **Features:** Fake packets, UDP traversal

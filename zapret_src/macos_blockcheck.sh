@@ -1,12 +1,13 @@
 #!/bin/bash
 #
 # Darkware Zapret - macOS Diagnostics
-# Диагностика блокировок и тестирование tpws стратегий
+# Диагностика блокировок и тестирование стратегий (tpws + ciadpi)
 #
 
 # Конфигурация
 ZAPRET_BASE="${ZAPRET_BASE:-/opt/darkware-zapret}"
 TPWS="${ZAPRET_BASE}/tpws/tpws"
+CIADPI="${ZAPRET_BASE}/byedpi/ciadpi"
 CURL_TIMEOUT="${CURL_TIMEOUT:-5}"
 SOCKS_PORT="${SOCKS_PORT:-19999}"
 DOMAIN="${DOMAIN:-discord.com}"
@@ -15,13 +16,13 @@ HTTP_URL="http://${DOMAIN}"
 
 # Результаты
 declare -a WORKING_STRATEGIES
-TPWS_PID=""
+ENGINE_PID=""
 
 # Очистка при выходе
 cleanup() {
-    if [ -n "$TPWS_PID" ] && kill -0 "$TPWS_PID" 2>/dev/null; then
-        kill "$TPWS_PID" 2>/dev/null || true
-        wait "$TPWS_PID" 2>/dev/null || true
+    if [ -n "$ENGINE_PID" ] && kill -0 "$ENGINE_PID" 2>/dev/null; then
+        kill "$ENGINE_PID" 2>/dev/null || true
+        wait "$ENGINE_PID" 2>/dev/null || true
     fi
 }
 trap cleanup EXIT INT TERM
@@ -39,6 +40,12 @@ check_system() {
         echo "tpws: NOT FOUND"
         echo "ERROR: Install Darkware Zapret first"
         exit 1
+    fi
+    
+    if [ -x "$CIADPI" ]; then
+        echo "ciadpi: OK"
+    else
+        echo "ciadpi: NOT FOUND"
     fi
     
     # Найти свободный порт
@@ -98,7 +105,7 @@ check_direct() {
     if [ $http_exit -eq 0 ] && echo "$http_code" | grep -q "^[23]"; then
         echo "HTTP: OK"
     else
-        echo "HTTP: FAILED (exit=$http_exit)"
+        echo "HTTP: BLOCKED (Code: $http_code)"
     fi
     
     # HTTPS
@@ -107,95 +114,99 @@ check_direct() {
     local https_exit=$?
     
     if [ $https_exit -eq 0 ] && echo "$https_code" | grep -q "^[23]"; then
-        echo "HTTPS: OK (no DPI block detected)"
-        HTTPS_WORKS=1
+        echo "HTTPS: OK"
+        echo "NOTE: Connection works without bypass!"
     else
         if [ $https_exit -eq 28 ]; then
-            echo "HTTPS: TIMEOUT (DPI block detected)"
+            echo "HTTPS: BLOCKED (Timeout)"
         else
-            echo "HTTPS: FAILED (exit=$https_exit)"
+            echo "HTTPS: BLOCKED (Curl exit code: $https_exit, HTTP code: $https_code)"
         fi
-        HTTPS_WORKS=0
     fi
     echo ""
 }
 
-# Запуск tpws
-start_tpws() {
-    local params="$@"
+# Функция теста стратегии (общая логика)
+test_strategy_generic() {
+    local engine_bin="$1"
+    local engine_name="$2"
+    local strategy_name="$3"
+    local args="$4"
     
-    if [ -n "$TPWS_PID" ] && kill -0 "$TPWS_PID" 2>/dev/null; then
-        kill "$TPWS_PID" 2>/dev/null || true
-        wait "$TPWS_PID" 2>/dev/null || true
-    fi
+    # Запуск движка
+    # >/dev/null 2>&1 убрано (если нужно дебажить, но для юзера лучше убрать мусор)
+    $engine_bin $args >/dev/null 2>&1 &
+    ENGINE_PID=$!
     
-    "$TPWS" --bind-addr=127.0.0.1 --port=$SOCKS_PORT --socks $params >/dev/null 2>&1 &
-    TPWS_PID=$!
-    sleep 0.3
+    # Дать время на старт
+    sleep 0.5
     
-    if ! kill -0 "$TPWS_PID" 2>/dev/null; then
-        TPWS_PID=""
-        return 1
-    fi
-    return 0
-}
-
-# Тест стратегии
-test_strategy() {
-    local name="$1"
-    local params="$2"
-    
-    if ! start_tpws $params; then
-        echo "  $name: ERROR (tpws failed)"
+    if ! kill -0 "$ENGINE_PID" 2>/dev/null; then
+        echo "  $strategy_name: FAILED TO START ($engine_name crashed)"
+        ENGINE_PID=""
         return 1
     fi
     
     local result
+    # Используем socks5h для удаленного DNS резолва
     result=$(curl -s --max-time "$CURL_TIMEOUT" \
-        --proxy "socks5://127.0.0.1:$SOCKS_PORT" \
+        --proxy "socks5h://127.0.0.1:$SOCKS_PORT" \
         -o /dev/null -w "%{http_code}" "$TEST_URL" 2>&1)
     local code=$?
     
-    if [ -n "$TPWS_PID" ]; then
-        kill "$TPWS_PID" 2>/dev/null || true
-        wait "$TPWS_PID" 2>/dev/null || true
-        TPWS_PID=""
+    if [ -n "$ENGINE_PID" ]; then
+        kill "$ENGINE_PID" 2>/dev/null || true
+        wait "$ENGINE_PID" 2>/dev/null || true
+        ENGINE_PID=""
     fi
     
     if [ $code -eq 0 ] && echo "$result" | grep -q "^[23]"; then
-        echo "  $name: OK"
-        WORKING_STRATEGIES+=("$name")
+        echo "  $strategy_name: OK"
+        WORKING_STRATEGIES+=("$engine_name: $strategy_name")
         return 0
     else
         if [ $code -eq 28 ]; then
-            echo "  $name: TIMEOUT"
+            echo "  $strategy_name: TIMEOUT"
         else
-            echo "  $name: FAILED"
+            echo "  $strategy_name: FAILED"
         fi
         return 1
     fi
 }
 
+# Тестирование TPWS
+test_tpws_strategy() {
+    local name="$1"
+    local args="$2"
+    # tpws needs --socks --port
+    test_strategy_generic "$TPWS" "tpws" "$name" "--socks --port $SOCKS_PORT $args"
+}
+
+# Тестирование CIADPI
+test_ciadpi_strategy() {
+    local name="$1"
+    local args="$2"
+    # ciadpi needs -p port
+    test_strategy_generic "$CIADPI" "ciadpi" "$name" "-p $SOCKS_PORT $args"
+}
+
 # Тестирование стратегий
 test_strategies() {
-    echo "=== TPWS STRATEGY TESTING ==="
-    echo "Domain: $DOMAIN"
+    echo "=== TPWS STRATEGIES ==="
+    test_tpws_strategy "Split+Disorder" "--split-pos=1,midsld --disorder"
+    test_tpws_strategy "TLSRec+Split" "--tlsrec=sniext --split-pos=1,midsld --disorder"
+    test_tpws_strategy "TLSRec MidSLD" "--tlsrec=midsld --split-pos=midsld --disorder"
+    test_tpws_strategy "TLSRec+OOB" "--tlsrec=sniext --split-pos=1,midsld --disorder --hostdot"
     echo ""
     
-    # Наши стратегии из приложения
-    echo "Darkware Strategies:"
-    test_strategy "Split+Disorder" "--split-pos=1,midsld --disorder"
-    test_strategy "TLSRec+Split" "--tlsrec=sniext --split-pos=1,midsld --disorder"
-    test_strategy "TLSRec MidSLD" "--tlsrec=midsld --split-pos=midsld --disorder"
-    test_strategy "TLSRec+OOB" "--tlsrec=sniext --split-pos=1,midsld --disorder --hostdot"
-    
-    echo ""
-    echo "Additional methods:"
-    test_strategy "split-pos=2" "--split-pos=2"
-    test_strategy "split-pos=2+disorder" "--split-pos=2 --disorder"
-    test_strategy "tlsrec=sniext" "--tlsrec=sniext"
-    test_strategy "tlsrec=midsld" "--tlsrec=midsld"
-    echo ""
+    if [ -x "$CIADPI" ]; then
+        echo "=== CIADPI STRATEGIES ==="
+        test_ciadpi_strategy "Disorder (Simple)" "-d 1"
+        test_ciadpi_strategy "Disorder (SNI)" "-d 1+s"
+        test_ciadpi_strategy "Fake Packets" "-d 1 -f -1 -t 6"
+        test_ciadpi_strategy "Auto (Torst)" "-A torst -d 1"
+        echo ""
+    fi
 }
 
 # Итоги
@@ -210,30 +221,23 @@ print_summary() {
             echo "  + $s"
         done
         echo ""
+        echo "RECOMMENDED: Select one of the working strategies above."
         
-        # Рекомендация на основе наших стратегий
-        local recommended=""
-        for s in "${WORKING_STRATEGIES[@]}"; do
-            case "$s" in
-                "Split+Disorder"*) recommended="Split+Disorder"; break;;
-                "TLSRec+Split"*) recommended="TLSRec+Split"; break;;
-                "TLSRec MidSLD"*) recommended="TLSRec MidSLD"; break;;
-                "TLSRec+OOB"*) recommended="TLSRec+OOB"; break;;
-            esac
-        done
-        
-        if [ -n "$recommended" ]; then
-            echo "RECOMMENDED: Select '$recommended' strategy in Darkware Zapret"
-        else
-            echo "NOTE: Your ISP may require custom tpws parameters"
+        # Попытка парсинга первой рабочей стратегии для рекомендации
+        local first_working="${WORKING_STRATEGIES[0]}"
+        if [[ "$first_working" == "tpws:"* ]]; then
+             echo "Default Engine: tpws"
+        elif [[ "$first_working" == "ciadpi:"* ]]; then
+             echo "Default Engine: ciadpi"
         fi
+        
     else
         echo "NO WORKING STRATEGIES FOUND"
         echo ""
         echo "Possible reasons:"
         echo "  - ISP blocks by IP, not DPI"
-        echo "  - Need different tpws parameters"
-        echo "  - Try VPN instead"
+        echo "  - Need custom parameters"
+        echo "  - Try using a VPN"
     fi
     
     echo ""
@@ -249,15 +253,15 @@ main() {
     # Парсинг аргументов
     while [ $# -gt 0 ]; do
         case "$1" in
-            --domain=*) 
+            --domain=*)
                 DOMAIN="${1#*=}"
                 TEST_URL="https://${DOMAIN}"
                 HTTP_URL="http://${DOMAIN}"
                 ;;
-            --timeout=*) CURL_TIMEOUT="${1#*=}" ;;
-            --help)
-                echo "Usage: $0 [--domain=DOMAIN] [--timeout=SEC]"
-                exit 0
+            SCANLEVEL=*)
+                # Игнорируем legacy параметр
+                ;;
+            *)
                 ;;
         esac
         shift
