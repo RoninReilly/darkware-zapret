@@ -60,18 +60,21 @@ Advanced SOCKS5 proxy with **UDP support**.
 |----------|-------------|
 | **Disorder (Simple)** | Splits TCP stream at the first byte (`-d 1`). Sends the first byte *after* the rest of the packet. Extremely effective against most DPI systems. |
 | **Disorder (SNI)** | Splits at the SNI (Server Name Indication) position. More precise but slightly more complex than simple disorder. |
-| **Fake Packets** | Injects fake TCP packets with low TTL (Time-To-Live) before the real packet. DPI analyzes the fake packet and lets the real one through. |
+| **Fake (OOB)** | Injects Out-of-Band (OOB) data. Effective strategy that confuses DPI inspection logic without relying on TTL tricks. |
 | **Auto (Torst)** | Automatically detects the block type using `torst` method and applies the best bypass technique. |
 
 ## How it Works
 
-The app uses `tpws` transparent proxy to modify outgoing TCP traffic, bypassing DPI (Deep Packet Inspection) filters. Traffic is redirected through macOS PF firewall rules.
+The app uses `tpws` (transparent proxy) or `ciadpi` (SOCKS5 proxy) to modify outgoing traffic, bypassing DPI (Deep Packet Inspection) filters. TCP traffic is redirected through macOS PF firewall rules, while UDP traffic is routed via system SOCKS settings (when using ciadpi).
 
 ## Build from Source
 
 ```bash
 git clone https://github.com/RoninReilly/darkware-zapret.git
 cd darkware-zapret
+# Compile TPWS binary
+cd zapret_src/tpws && make mac && cd ../..
+# Build App
 ./create_app.sh
 ```
 
