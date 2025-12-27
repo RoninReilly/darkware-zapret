@@ -26,6 +26,15 @@ mkdir -p "$TARGET_DIR"
 # Copy files (using dot syntax for reliable copying of content)
 cp -R "$SOURCE_DIR/." "$TARGET_DIR/" || { echo "Copy failed" >> "$LOG"; exit 1; }
 
+# Copy ByeDPI if exists
+BYEDPI_DIR="$SCRIPT_DIR/zapret_src/byedpi"
+if [ -d "$BYEDPI_DIR" ]; then
+    mkdir -p "$TARGET_DIR/byedpi"
+    cp "$BYEDPI_DIR/ciadpi" "$TARGET_DIR/byedpi/" 2>/dev/null || true
+    chmod +x "$TARGET_DIR/byedpi/ciadpi" 2>/dev/null || true
+    echo "ByeDPI installed" >> "$LOG"
+fi
+
 # Create/Reset strategy config if not exists - write default working config
 if [ ! -f "$TARGET_DIR/config_custom" ]; then
     cat > "$TARGET_DIR/config_custom" <<'CONFIGEOF'

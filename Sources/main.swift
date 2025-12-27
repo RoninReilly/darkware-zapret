@@ -81,27 +81,61 @@ struct ContentView: View {
                     
                     Divider()
                     
-                    // Strategy Selection
+                    // Engine Selection
                     HStack {
-                        Text("Strategy")
+                        Text("Engine")
                             .font(.body)
                         Spacer()
                         Picker("", selection: Binding(
-                            get: { zapretManager.currentStrategy },
-                            set: { zapretManager.setStrategy($0) }
+                            get: { zapretManager.currentEngine },
+                            set: { zapretManager.setEngine($0) }
                         )) {
-                            ForEach(ZapretStrategy.allCases) { strategy in
-                                Text(strategy.rawValue).tag(strategy)
+                            ForEach(Engine.allCases) { engine in
+                                Text(engine.rawValue).tag(engine)
                             }
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .frame(width: 140)
+                        .frame(width: 140) // Fixed width for alignment
                         .disabled(zapretManager.isLoading)
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
                     
+                    // Strategy Selection (dynamic based on engine)
+                    HStack {
+                        Text("Strategy")
+                            .font(.body)
+                        Spacer()
+                        
+                        Group {
+                            if zapretManager.currentEngine == .tpws {
+                                Picker("", selection: Binding(
+                                    get: { zapretManager.currentStrategy },
+                                    set: { zapretManager.setStrategy($0) }
+                                )) {
+                                    ForEach(ZapretStrategy.allCases) { strategy in
+                                        Text(strategy.rawValue).tag(strategy)
+                                    }
+                                }
+                            } else {
+                                Picker("", selection: Binding(
+                                    get: { zapretManager.currentByeDPIStrategy },
+                                    set: { zapretManager.setByeDPIStrategy($0) }
+                                )) {
+                                    ForEach(ByeDPIStrategy.allCases) { strategy in
+                                        Text(strategy.rawValue).tag(strategy)
+                                    }
+                                }
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 140) // Fixed width for alignment
+                        .disabled(zapretManager.isLoading)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 4)
                 } else {
                     // Install Row
                     Button(action: { installerManager.install() }) {
@@ -212,17 +246,35 @@ struct ContentView: View {
     }
 }
 
-// Strategies
-enum ZapretStrategy: String, CaseIterable, Identifiable {
+// MARK: - Engines
+
+enum Engine: String, CaseIterable, Identifiable {
+    case tpws = "tpws"
+    case byedpi = "ciadpi" // Renamed as requested
+    
+    var id: String { self.rawValue }
+    
+    var description: String {
+        switch self {
+        case .tpws:
+            return "Transparent proxy (TCP only)"
+        case .byedpi:
+            return "SOCKS5 proxy (TCP + UDP)"
+        }
+    }
+}
+
+// MARK: - tpws Strategies (existing)
+
+enum TpwsStrategy: String, CaseIterable, Identifiable {
     case splitDisorder = "Split+Disorder"
-    case discordFix = "TLSRec+Split"
-    case tlsrecSplit = "TLSRec MidSLD"
-    case aggressive = "TLSRec+OOB"
+    case tlsrecSplit = "TLSRec+Split"
+    case tlsrecMidsld = "TLSRec MidSLD"
+    case tlsrecOob = "TLSRec+OOB"
     
     var id: String { self.rawValue }
     
     var configContent: String {
-        // Use exact same format as original zapret config with <HOSTLIST> placeholders
         let commonVars = """
         MODE_FILTER=autohostlist
         TPWS_ENABLE=1
@@ -236,7 +288,6 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
         
         switch self {
         case .splitDisorder:
-            // Original working strategy for YouTube
             return """
             \(commonVars)
             TPWS_OPT="
@@ -244,8 +295,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
             --filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>
             "
             """
-        case .discordFix:
-            // Strategy with tlsrec for Discord compatibility
+        case .tlsrecSplit:
             return """
             \(commonVars)
             TPWS_OPT="
@@ -253,8 +303,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
             --filter-tcp=443 --tlsrec=sniext --split-pos=1,midsld --disorder <HOSTLIST>
             "
             """
-        case .tlsrecSplit:
-            // TLS record split at SNI extension boundary
+        case .tlsrecMidsld:
             return """
             \(commonVars)
             TPWS_OPT="
@@ -262,8 +311,7 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
             --filter-tcp=443 --tlsrec=midsld --split-pos=midsld --disorder <HOSTLIST>
             "
             """
-        case .aggressive:
-            // Most aggressive strategy with multiple techniques
+        case .tlsrecOob:
             return """
             \(commonVars)
             TPWS_OPT="
@@ -275,12 +323,82 @@ enum ZapretStrategy: String, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - ciadpi Strategies
+
+enum ByeDPIStrategy: String, CaseIterable, Identifiable {
+    case disorder = "Disorder (Simple)"
+    case disorderSNI = "Disorder (SNI)"
+    case fake = "Fake Packets"
+    case auto = "Auto (Torst)"
+    
+    var id: String { self.rawValue }
+    
+    var arguments: [String] {
+        switch self {
+        case .disorder:
+            // Simple disorder at byte 1 (classic)
+            return ["-d", "1"]
+        case .disorderSNI:
+            // Disorder at SNI position
+            return ["-d", "1+s"]
+        case .fake:
+            // Fake packets with low TTL
+            return ["-d", "1", "-f", "-1", "-t", "6"]
+        case .auto:
+            // Auto detection
+            return ["-A", "torst", "-d", "1"]
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .disorder:
+            return "Split at byte 1 & reverse order"
+        case .disorderSNI:
+            return "Split at SNI & reverse order"
+        case .fake:
+            return "Send fake packets with low TTL"
+        case .auto:
+            return "Auto-detect blocking type"
+        }
+    }
+}
+
+
+
+// MARK: - Legacy ZapretStrategy (for backward compatibility)
+
+enum ZapretStrategy: String, CaseIterable, Identifiable {
+    case splitDisorder = "Split+Disorder"
+    case discordFix = "TLSRec+Split"
+    case tlsrecSplit = "TLSRec MidSLD"
+    case aggressive = "TLSRec+OOB"
+    
+    var id: String { self.rawValue }
+    
+    // Convert to new TpwsStrategy
+    var asTpwsStrategy: TpwsStrategy {
+        switch self {
+        case .splitDisorder: return .splitDisorder
+        case .discordFix: return .tlsrecSplit
+        case .tlsrecSplit: return .tlsrecMidsld
+        case .aggressive: return .tlsrecOob
+        }
+    }
+    
+    var configContent: String {
+        return asTpwsStrategy.configContent
+    }
+}
+
 @MainActor
 class ZapretManager: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
+    @Published var currentEngine: Engine = .tpws
     @Published var currentStrategy: ZapretStrategy = .splitDisorder
+    @Published var currentByeDPIStrategy: ByeDPIStrategy = .disorder
     
     private let startCommand = "sudo /opt/darkware-zapret/init.d/macos/zapret start"
     private let stopCommand = "sudo /opt/darkware-zapret/init.d/macos/zapret stop"
@@ -288,9 +406,20 @@ class ZapretManager: ObservableObject {
     private let configPath = "/opt/darkware-zapret/config_custom"
     
     init() {
+        // Load saved engine
+        if let savedEngine = UserDefaults.standard.string(forKey: "Engine"),
+           let engine = Engine(rawValue: savedEngine) {
+            self.currentEngine = engine
+        }
+        // Load saved tpws strategy
         if let saved = UserDefaults.standard.string(forKey: "ZapretStrategy"),
            let strategy = ZapretStrategy(rawValue: saved) {
             self.currentStrategy = strategy
+        }
+        // Load saved ByeDPI strategy
+        if let savedByeDPI = UserDefaults.standard.string(forKey: "ByeDPIStrategy"),
+           let strategy = ByeDPIStrategy(rawValue: savedByeDPI) {
+            self.currentByeDPIStrategy = strategy
         }
     }
     
@@ -336,18 +465,232 @@ class ZapretManager: ObservableObject {
         }
     }
     
-    nonisolated private func checkProcessRunning() -> Bool {
-        let task = Process()
-        task.launchPath = "/usr/bin/pgrep"
-        task.arguments = ["-f", "/opt/darkware-zapret/tpws/tpws"]
+    func setEngine(_ engine: Engine) {
+        guard engine != currentEngine else { return }
         
+        let wasRunning = isRunning
+        
+        // If service is running, stop ALL engines first
+        if wasRunning {
+            stopAllEngines()
+        }
+        
+        currentEngine = engine
+        UserDefaults.standard.set(engine.rawValue, forKey: "Engine")
+        
+        // Auto-start new engine if was running before
+        if wasRunning {
+            // Use toggleZapret to start, since isRunning is now false
+            toggleZapret()
+        }
+    }
+    
+    private func stopCurrentEngine() {
+        isLoading = true
+        
+        let command: String
+        switch currentEngine {
+        case .tpws:
+            command = stopCommand
+        case .byedpi:
+            command = "pkill -f ciadpi 2>/dev/null || true"
+            // Disable system SOCKS proxy when stopping ByeDPI
+            disableSystemProxy()
+        }
+        
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", command]
         task.standardOutput = Pipe()
         task.standardError = Pipe()
         
         do {
             try task.run()
             task.waitUntilExit()
-            return task.terminationStatus == 0
+        } catch {
+            errorMessage = "Failed to stop: \(error.localizedDescription)"
+        }
+        
+        isRunning = false
+        isLoading = false
+    }
+    
+    private func startCurrentEngine() {
+        isLoading = true
+        
+        switch currentEngine {
+        case .tpws:
+            // Use existing tpws start logic
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.launchPath = "/bin/sh"
+                task.arguments = ["-c", self.startCommand]
+                task.standardOutput = Pipe()
+                task.standardError = Pipe()
+                
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    DispatchQueue.main.async {
+                        self.isRunning = task.terminationStatus == 0
+                        self.isLoading = false
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Failed to start: \(error.localizedDescription)"
+                        self.isLoading = false
+                    }
+                }
+            }
+            
+        case .byedpi:
+            // Start ByeDPI as SOCKS5 proxy
+            startByeDPI()
+        }
+    }
+    
+    private func startByeDPI() {
+        let byedpiPath = "/opt/darkware-zapret/byedpi/ciadpi"
+        let port = "1080"
+        let logFile = "/tmp/ciadpi.log"
+        
+        // Ensure log file exists/reset
+        let p = Process()
+        p.launchPath = "/bin/sh"
+        p.arguments = ["-c", "echo 'Starting ciadpi...' > \(logFile)"]
+        try? p.run()
+        p.waitUntilExit()
+        
+        let args = ["-p", port] + currentByeDPIStrategy.arguments
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Start ByeDPI process
+            let task = Process()
+            task.launchPath = byedpiPath
+            task.arguments = args
+            
+            // Redirect output to log file
+            task.standardOutput = FileHandle(forWritingAtPath: logFile) ?? Pipe().fileHandleForWriting
+            task.standardError = FileHandle(forWritingAtPath: logFile) ?? Pipe().fileHandleForWriting
+            
+            do {
+                try task.run()
+                
+                // Give it a moment to start
+                Thread.sleep(forTimeInterval: 0.5)
+                
+                // Enable system SOCKS proxy automatically
+                self.enableSystemProxy(port: port)
+                
+                DispatchQueue.main.async {
+                    self.isRunning = true
+                    self.isLoading = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.errorMessage = "Failed to start ciadpi: \(error.localizedDescription)"
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func enableSystemProxy(port: String) {
+        // Get active network service (Wi-Fi or Ethernet)
+        let services = ["Wi-Fi", "Ethernet", "USB 10/100/1000 LAN"]
+        
+        for service in services {
+            let checkTask = Process()
+            checkTask.launchPath = "/usr/sbin/networksetup"
+            checkTask.arguments = ["-getinfo", service]
+            checkTask.standardOutput = Pipe()
+            checkTask.standardError = Pipe()
+            
+            do {
+                try checkTask.run()
+                checkTask.waitUntilExit()
+                
+                if checkTask.terminationStatus == 0 {
+                    // This service exists, configure SOCKS proxy
+                    let setProxy = Process()
+                    setProxy.launchPath = "/usr/sbin/networksetup"
+                    setProxy.arguments = ["-setsocksfirewallproxy", service, "127.0.0.1", port]
+                    setProxy.standardOutput = Pipe()
+                    setProxy.standardError = Pipe()
+                    try setProxy.run()
+                    setProxy.waitUntilExit()
+                    
+                    let enableProxy = Process()
+                    enableProxy.launchPath = "/usr/sbin/networksetup"
+                    enableProxy.arguments = ["-setsocksfirewallproxystate", service, "on"]
+                    enableProxy.standardOutput = Pipe()
+                    enableProxy.standardError = Pipe()
+                    try enableProxy.run()
+                    enableProxy.waitUntilExit()
+                }
+            } catch {}
+        }
+    }
+    
+    private func disableSystemProxy() {
+        let services = ["Wi-Fi", "Ethernet", "USB 10/100/1000 LAN"]
+        
+        for service in services {
+            let disableProxy = Process()
+            disableProxy.launchPath = "/usr/sbin/networksetup"
+            disableProxy.arguments = ["-setsocksfirewallproxystate", service, "off"]
+            disableProxy.standardOutput = Pipe()
+            disableProxy.standardError = Pipe()
+            
+            do {
+                try disableProxy.run()
+                disableProxy.waitUntilExit()
+            } catch {}
+        }
+    }
+    
+    func setByeDPIStrategy(_ strategy: ByeDPIStrategy) {
+        guard strategy != currentByeDPIStrategy else { return }
+        
+        currentByeDPIStrategy = strategy
+        UserDefaults.standard.set(strategy.rawValue, forKey: "ByeDPIStrategy")
+        
+        // If ByeDPI is running, restart with new strategy
+        if currentEngine == .byedpi && isRunning {
+            toggleZapret() // Stop
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.toggleZapret() // Start again with new strategy
+            }
+        }
+    }
+    
+    nonisolated private func checkProcessRunning() -> Bool {
+        // Check for tpws
+        let tpwsTask = Process()
+        tpwsTask.launchPath = "/usr/bin/pgrep"
+        tpwsTask.arguments = ["-f", "/opt/darkware-zapret/tpws/tpws"]
+        tpwsTask.standardOutput = Pipe()
+        tpwsTask.standardError = Pipe()
+        
+        do {
+            try tpwsTask.run()
+            tpwsTask.waitUntilExit()
+            if tpwsTask.terminationStatus == 0 {
+                return true
+            }
+        } catch {}
+        
+        // Check for ByeDPI
+        let byedpiTask = Process()
+        byedpiTask.launchPath = "/usr/bin/pgrep"
+        byedpiTask.arguments = ["-f", "ciadpi"]
+        byedpiTask.standardOutput = Pipe()
+        byedpiTask.standardError = Pipe()
+        
+        do {
+            try byedpiTask.run()
+            byedpiTask.waitUntilExit()
+            return byedpiTask.terminationStatus == 0
         } catch {
             return false
         }
@@ -359,41 +702,79 @@ class ZapretManager: ObservableObject {
         
         let wasRunning = isRunning
         let targetState = !wasRunning
-        isRunning = targetState
         
-        let command = wasRunning ? stopCommand : startCommand
-        
-        DispatchQueue.global(qos: .userInitiated).async {
-            let task = Process()
-            task.launchPath = "/bin/sh"
-            task.arguments = ["-c", command]
-            
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.standardError = pipe
-            
-            do {
-                try task.run()
-                task.waitUntilExit()
+        if wasRunning {
+            // Stop ALL engines (both tpws and byedpi)
+            stopAllEngines()
+        } else {
+            // Start current engine
+            switch currentEngine {
+            case .tpws:
+                isRunning = targetState
+                let command = startCommand
                 
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8) ?? ""
-                
-                DispatchQueue.main.async {
-                    if task.terminationStatus != 0 {
-                        self.errorMessage = "Failed: \(output)"
-                        self.isRunning = wasRunning
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let task = Process()
+                    task.launchPath = "/bin/sh"
+                    task.arguments = ["-c", command]
+                    
+                    let pipe = Pipe()
+                    task.standardOutput = pipe
+                    task.standardError = pipe
+                    
+                    do {
+                        try task.run()
+                        task.waitUntilExit()
+                        
+                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                        let output = String(data: data, encoding: .utf8) ?? ""
+                        
+                        DispatchQueue.main.async {
+                            if task.terminationStatus != 0 {
+                                self.errorMessage = "Failed: \(output)"
+                                self.isRunning = false
+                            }
+                            self.isLoading = false
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            self.errorMessage = "Exec failed: \(error.localizedDescription)"
+                            self.isRunning = false
+                            self.isLoading = false
+                        }
                     }
-                    self.isLoading = false
                 }
-            } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = "Exec failed: \(error.localizedDescription)"
-                    self.isRunning = wasRunning
-                    self.isLoading = false
-                }
+                
+            case .byedpi:
+                startByeDPI()
             }
         }
+    }
+    
+    private func stopAllEngines() {
+        // Stop tpws
+        let tpwsStop = Process()
+        tpwsStop.launchPath = "/bin/sh"
+        tpwsStop.arguments = ["-c", stopCommand]
+        tpwsStop.standardOutput = Pipe()
+        tpwsStop.standardError = Pipe()
+        try? tpwsStop.run()
+        tpwsStop.waitUntilExit()
+        
+        // Stop ByeDPI
+        let byedpiStop = Process()
+        byedpiStop.launchPath = "/bin/sh"
+        byedpiStop.arguments = ["-c", "pkill -9 ciadpi 2>/dev/null || true"]
+        byedpiStop.standardOutput = Pipe()
+        byedpiStop.standardError = Pipe()
+        try? byedpiStop.run()
+        byedpiStop.waitUntilExit()
+        
+        // Disable system proxy
+        disableSystemProxy()
+        
+        isRunning = false
+        isLoading = false
     }
 }
 

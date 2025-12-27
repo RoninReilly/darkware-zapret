@@ -32,14 +32,36 @@
 > xattr -cr /Applications/"darkware zapret.app"
 > ```
 
+## Engines
+
+### tpws
+Lightweight TCP-only transparent proxy. Best for simple web browsing and standard HTTPS bypass.
+- **Protocol:** TCP Only
+- **Mode:** Transparent Proxy
+
+### ciadpi (ByeDPI)
+Advanced SOCKS5 proxy with **UDP support**. Required for **Discord Voice**, **WebRTC**, and **HTTP/3 (QUIC)**.
+- **Protocol:** TCP + UDP
+- **Mode:** System SOCKS5 Proxy (Auto-configured)
+- **Features:** Fake packets, UDP traversal
+
 ## Strategies
 
+### tpws Strategies
 | Strategy | Description |
 |----------|-------------|
 | **Split+Disorder** | Splits TCP packet at position 1 and middle of domain name (midsld). Sends second fragment before first using `--disorder` flag. DPI expects ordered packets and fails to reassemble the hostname. |
 | **TLSRec+Split** | Creates two TLS records by splitting at SNI extension boundary (`--tlsrec=sniext`). Combined with TCP split at midsld position and disorder. DPI sees incomplete TLS handshake in first record. |
 | **TLSRec MidSLD** | Splits TLS record right in the middle of second-level domain (`--tlsrec=midsld`). Example: `disco` + `rd.com`. DPI cannot match partial domain against blocklist. |
 | **TLSRec+OOB** | All of the above plus `--hostdot` which adds a dot after hostname in HTTP Host header. Additional confusion layer for HTTP-level DPI inspection. |
+
+### ciadpi Strategies
+| Strategy | Description |
+|----------|-------------|
+| **Disorder (Simple)** | Splits TCP stream at the first byte (`-d 1`). Sends the first byte *after* the rest of the packet. Extremely effective against most DPI systems. |
+| **Disorder (SNI)** | Splits at the SNI (Server Name Indication) position. More precise but slightly more complex than simple disorder. |
+| **Fake Packets** | Injects fake TCP packets with low TTL (Time-To-Live) before the real packet. DPI analyzes the fake packet and lets the real one through. |
+| **Auto (Torst)** | Automatically detects the block type using `torst` method and applies the best bypass technique. |
 
 ## How it Works
 
@@ -58,6 +80,7 @@ cd darkware-zapret
 ## Credits
 
 - Powered by [zapret](https://github.com/bol-van/zapret) by bol-van
+- Powered by [byedpi](https://github.com/hufrea/byedpi) by hufrea (ciadpi engine)
 - Hostlist from [Re-filter](https://github.com/1andrevich/Re-filter-lists)
 
 ## License
