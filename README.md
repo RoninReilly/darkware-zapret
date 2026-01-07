@@ -29,7 +29,7 @@
 
 > **Note:** If you see "App is damaged" error, run in Terminal:
 > ```bash
-> xattr -cr /Applications/"darkware zapret.app"
+> /usr/bin/xattr -cr /Applications/"darkware zapret.app"
 > ```
 
 ## Engines

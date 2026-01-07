@@ -575,6 +575,13 @@ class ZapretManager: ObservableObject {
         
         let args = ["-p", port] + currentByeDPIStrategy.arguments
         
+        // Log the arguments for debugging
+        let argsLog = Process()
+        argsLog.launchPath = "/bin/sh"
+        argsLog.arguments = ["-c", "echo 'Arguments: \(args.joined(separator: " "))' >> \(logFile)"]
+        try? argsLog.run()
+        argsLog.waitUntilExit()
+        
         DispatchQueue.global(qos: .userInitiated).async {
             // Start ByeDPI process
             let task = Process()
@@ -588,15 +595,25 @@ class ZapretManager: ObservableObject {
             do {
                 try task.run()
                 
-                // Give it a moment to start
-                Thread.sleep(forTimeInterval: 0.5)
+                // Give it a moment to start and potentially fail
+                Thread.sleep(forTimeInterval: 0.8)
                 
-                // Enable system SOCKS proxy automatically
-                self.enableSystemProxy(port: port)
-                
-                DispatchQueue.main.async {
-                    self.isRunning = true
-                    self.isLoading = false
+                // CRITICAL: Check if process is still running before enabling proxy!
+                if task.isRunning {
+                    // Process is alive, safe to enable proxy
+                    self.enableSystemProxy(port: port)
+                    
+                    DispatchQueue.main.async {
+                        self.isRunning = true
+                        self.isLoading = false
+                    }
+                } else {
+                    // Process died immediately - DO NOT enable proxy!
+                    DispatchQueue.main.async {
+                        self.errorMessage = "ciadpi exited with code \(task.terminationStatus). Check /tmp/ciadpi.log"
+                        self.isRunning = false
+                        self.isLoading = false
+                    }
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -903,11 +920,37 @@ class InstallerManager: ObservableObject {
 
 // MARK: - Diagnostics
 
+enum DiagnosticsMode: String, CaseIterable, Identifiable {
+    case quick = "Quick Check"
+    case bruteforce = "Bruteforce"
+    
+    var id: String { self.rawValue }
+    
+    var description: String {
+        switch self {
+        case .quick:
+            return "Fast check of common strategies"
+        case .bruteforce:
+            return "Test ALL parameter combinations (slow)"
+        }
+    }
+    
+    var scriptName: String {
+        switch self {
+        case .quick:
+            return "macos_blockcheck.sh"
+        case .bruteforce:
+            return "macos_bruteforce.sh"
+        }
+    }
+}
+
 @MainActor
 class DiagnosticsManager: ObservableObject {
     @Published var isRunning = false
     @Published var output = ""
     @Published var testDomain = "discord.com"
+    @Published var mode: DiagnosticsMode = .quick
     
     private var process: Process?
     
@@ -917,15 +960,17 @@ class DiagnosticsManager: ObservableObject {
         output = ""
         
         let zapretPath = "/opt/darkware-zapret"
-        let blockcheckPath = "\(zapretPath)/macos_blockcheck.sh"
+        let scriptPath = "\(zapretPath)/\(mode.scriptName)"
         
-        // Check if macos_blockcheck exists
-        guard FileManager.default.fileExists(atPath: blockcheckPath) else {
-            output += "Error: macos_blockcheck.sh not found at \(blockcheckPath)\n"
+        // Check if script exists
+        guard FileManager.default.fileExists(atPath: scriptPath) else {
+            output += "Error: \(mode.scriptName) not found at \(scriptPath)\n"
             output += "Please reinstall Darkware Zapret.\n"
             isRunning = false
             return
         }
+        
+        let timeout = mode == .bruteforce ? "3" : "5"
         
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -934,7 +979,7 @@ class DiagnosticsManager: ObservableObject {
             process.executableURL = URL(fileURLWithPath: "/bin/bash")
             process.arguments = ["-c", """
                 cd "\(zapretPath)" && \
-                ./macos_blockcheck.sh --domain="\(self.testDomain)" --timeout=5 2>&1
+                ./\(self.mode.scriptName) --domain="\(self.testDomain)" --timeout=\(timeout) 2>&1
                 """]
             
             process.currentDirectoryURL = URL(fileURLWithPath: zapretPath)
@@ -992,17 +1037,39 @@ struct DiagnosticsView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Settings
-            
-            // Settings
-            HStack {
-                Text("Domain:")
-                    .font(.subheadline)
-                TextField("Domain to test", text: $diagnosticsManager.testDomain)
-                    .textFieldStyle(.roundedBorder)
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Domain:")
+                        .font(.subheadline)
+                    TextField("Domain to test", text: $diagnosticsManager.testDomain)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 180)
+                        .disabled(diagnosticsManager.isRunning)
+                    
+                    Spacer()
+                    
+                    Text("Mode:")
+                        .font(.subheadline)
+                    Picker("", selection: $diagnosticsManager.mode) {
+                        ForEach(DiagnosticsMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                     .frame(width: 200)
                     .disabled(diagnosticsManager.isRunning)
+                }
                 
-                Spacer()
+                if diagnosticsManager.mode == .bruteforce {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("Bruteforce mode tests all combinations. This may take several minutes.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                }
             }
             .padding(.horizontal)
             .padding(.vertical, 8)

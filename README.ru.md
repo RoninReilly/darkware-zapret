@@ -28,7 +28,7 @@
 
 > **Если видишь ошибку "Приложение повреждено"**, выполни в Терминале:
 > ```bash
-> xattr -cr /Applications/"darkware zapret.app"
+> /usr/bin/xattr -cr /Applications/"darkware zapret.app"
 > ```
 
 ## Движки (Engines)
